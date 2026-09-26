@@ -1,0 +1,1 @@
+# obfuscate_lua-v2.0
