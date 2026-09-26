@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Web Lua Obfuscator & Raw Generator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #0b0f19; color: #f8fafc; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        h1 { margin-bottom: 10px; color: #38bdf8; font-size: 2rem; font-weight: 700; text-align: center; }
+        p.subtitle { color: #94a3b8; margin-bottom: 20px; font-size: 0.95rem; text-align: center; }
+        
+        .options-bar { display: flex; gap: 15px; margin-bottom: 15px; background: #1e293b; padding: 12px 20px; border-radius: 8px; border: 1px solid #334155; flex-wrap: wrap; width: 100%; max-width: 1200px; align-items: center; }
+        .options-bar label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: #cbd5e1; font-size: 0.9rem; font-weight: 500; }
+        .options-bar input[type="checkbox"] { accent-color: #0284c7; width: 16px; height: 16px; cursor: pointer; }
+        
+        .raw-input-group { display: flex; gap: 10px; width: 100%; margin-top: 5px; align-items: center; }
+        .raw-input-group input { flex: 1; background: #111827; border: 1px solid #334155; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; }
+        .raw-input-group input:focus { border-color: #38bdf8; }
+
+        .container { display: flex; width: 100%; max-width: 1200px; gap: 20px; flex-wrap: wrap; }
+        .pane { flex: 1; display: flex; flex-direction: column; min-width: 300px; }
+        
+        .pane-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        label.pane-title { font-weight: 600; color: #cbd5e1; font-size: 0.95rem; }
+        .stats { font-size: 0.8rem; color: #64748b; }
+
+        textarea { width: 100%; height: 380px; background-color: #111827; color: #e2e8f0; border: 1px solid #374151; border-radius: 8px; padding: 12px; font-family: 'Fira Code', monospace, monospace; font-size: 13.5px; resize: vertical; outline: none; line-height: 1.5; }
+        textarea:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); }
+
+        .btn-group { display: flex; gap: 12px; margin-top: 15px; width: 100%; max-width: 1200px; }
+        button { flex: 1; background-color: #0284c7; color: white; border: none; padding: 12px 20px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        button:hover { background-color: #0369a1; }
+        button.secondary { background-color: #334155; }
+        button.secondary:hover { background-color: #475569; }
+        button.success { background-color: #059669; }
+        button.success:hover { background-color: #047857; }
+        
+        #toast { position: fixed; bottom: 20px; background: #10b981; color: white; padding: 10px 20px; border-radius: 6px; font-weight: 600; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 1000; }
+        #toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <h1>Advanced Web Lua Obfuscator</h1>
+    <p class="subtitle">Bảo vệ mã nguồn Lua và tạo Loadstring / Raw Script tự động cho Roblox.</p>
+
+    <div class="options-bar">
+        <label><input type="checkbox" id="chkMinify" checked> Xóa khoảng trắng & Chú thích</label>
+        <label><input type="checkbox" id="chkRename" checked> Đổi tên biến cục bộ</label>
+        <label><input type="checkbox" id="chkEncrypt" checked> Mã hóa Byte ẩn danh</label>
+        <div style="width: 100%; border-top: 1px solid #334155; margin-top: 5px; padding-top: 8px;">
+            <label><input type="checkbox" id="chkRawTemplate" onchange="toggleRawInput(this)"> Tạo Loadstring Template (game:HttpGet)</label>
+            <div class="raw-input-group" id="rawUrlGroup" style="display: none;">
+                <input type="text" id="rawUrlInput" placeholder="Nhập link raw của bạn vào đây (VD: https://raw.githubusercontent.com/.../script.lua)">
+            </div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="pane">
+            <div class="pane-header">
+                <label class="pane-title" for="inputCode">Mã Lua Gốc (Input):</label>
+                <span class="stats" id="inputStats">0 dòng | 0 ký tự</span>
+            </div>
+            <textarea id="inputCode" placeholder="Nhập code Lua của bạn vào đây..." oninput="updateStats('input')"></textarea>
+        </div>
+        <div class="pane">
+            <div class="pane-header">
+                <label class="pane-title" for="outputCode">Mã Đã Obfuscate & Raw (Output):</label>
+                <span class="stats" id="outputStats">0 dòng | 0 ký tự</span>
+            </div>
+            <textarea id="outputCode" readonly placeholder="Kết quả obfuscate sẽ hiển thị ở đây..." oninput="updateStats('output')"></textarea>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button class="secondary" onclick="clearAll()">Xóa tất cả</button>
+        <button onclick="obfuscateLua()">Tiến hành Obfuscate</button>
+        <button class="success" onclick="copyCode()">Sao chép kết quả</button>
+    </div>
+
+    <div id="toast">Đã sao chép vào bộ nhớ tạm!</div>
+
+    <script>
+        function updateStats(type) {
+            const text = document.getElementById(type + 'Code').value;
+            const lines = text ? text.split('\n').length : 0;
+            const chars = text.length;
+            document.getElementById(type + 'Stats').innerText = `${lines} dòng | ${chars} ký tự`;
+        }
+
+        function clearAll() {
+            document.getElementById('inputCode').value = '';
+            document.getElementById('outputCode').value = '';
+            updateStats('input');
+            updateStats('output');
+        }
+
+        function toggleRawInput(checkbox) {
+            const group = document.getElementById('rawUrlGroup');
+            group.style.display = checkbox.checked ? 'flex' : 'none';
+        }
+
+        function copyCode() {
+            const output = document.getElementById('outputCode');
+            if (!output.value) return;
+            navigator.clipboard.writeText(output.value);
+            const toast = document.getElementById('toast');
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function generateRandomVarName() {
+            const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            let result = '_0x';
+            for (let i = 0; i < 6; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        function obfuscateLua() {
+            let code = document.getElementById('inputCode').value;
+            if (!code.trim()) {
+                alert("Vui lòng nhập mã Lua cần obfuscate!");
+                return;
+            }
+
+            const useMinify = document.getElementById('chkMinify').checked;
+            const useRename = document.getElementById('chkRename').checked;
+            const useEncrypt = document.getElementById('chkEncrypt').checked;
+            const useRawTemplate = document.getElementById('chkRawTemplate').checked;
+            const rawUrl = document.getElementById('rawUrlInput').value.trim();
+
+            // 1. Minify
+            if (useMinify) {
+                code = code.replace(/--[^\r\n]*/g, '');
+                code = code.replace(/--\[\[[\s\S]*?\]\]/g, '');
+                code = code.replace(/\r\n/g, '\n').replace(/\n\s*\n/g, '\n');
+            }
+
+            // 2. Variable Renaming
+            if (useRename) {
+                const keywords = new Set([
+                    'and', 'break', 'do', 'else', 'elseif', 'end', 'false', 'for', 
+                    'function', 'if', 'in', 'local', 'nil', 'not', 'or', 'repeat', 
+                    'return', 'then', 'true', 'until', 'while', 'self', 'print', 'warn', 'error', 'pcall', 'xpcall'
+                ]);
+                
+                const localRegex = /\blocal\s+([a-zA-Z_][a-zA-Z0-9_]*)/g;
+                let match;
+                const varMap = new Map();
+
+                while ((match = localRegex.exec(code)) !== null) {
+                    const varName = match[1];
+                    if (!keywords.has(varName) && !varMap.has(varName)) {
+                        varMap.set(varName, generateRandomVarName());
+                    }
+                }
+
+                varMap.forEach((newVal, oldVal) => {
+                    const regex = new RegExp(`\\b${oldVal}\\b`, 'g');
+                    code = code.replace(regex, newVal);
+                });
+            }
+
+            let finalOutput = '';
+
+            // 3. Byte Encryption
+            if (useEncrypt) {
+                const key = Math.floor(Math.random() * 200) + 10;
+                const bytes = [];
+                for (let i = 0; i < code.length; i++) {
+                    bytes.push((code.charCodeAt(i) + key) % 256);
+                }
+
+                finalOutput = `--[[\n    Protected by Advanced Web Lua Obfuscator\n]]--\n` +
+                `local _0xB = {${bytes.join(', ')}}\n` +
+                `local _0xK = ${key}\n` +
+                `local _0xC = {}\n` +
+                `for i = 1, #_0xB do\n` +
+                `    _0xC[i] = string.char((_0xB[i] - _0xK) % 256)\n` +
+                `end\n` +
+                `local _0xS = table.concat(_0xC)\n` +
+                `local _0xF, _0xE = pcall(function()\n` +
+                `    return loadstring(_0xS)\n` +
+                `end)\n` +
+                `if _0xF and _0xE then\n` +
+                `    pcall(_0xE)\n` +
+                `else\n` +
+                `    warn("Execution Error: " + tostring(_0xE))\n` +
+                `end`;
+            } else {
+                finalOutput = code;
+            }
+
+            // 4. Raw Template / Loadstring Generator
+            if (useRawTemplate) {
+                const targetUrl = rawUrl !== "" ? rawUrl : "DIEN_LINK_RAW_CUA_BAN_O_DAY";
+                finalOutput = `-- Loadstring / Raw Script Template\n` +
+                `loadstring(game:HttpGet("${targetUrl}"))()\n\n` +
+                `--[[ --- NỘI DUNG CODE ĐÃ OBFUSCATE BÊN DƯỚI --- ]]--\n\n` + 
+                finalOutput;
+            }
+
+            document.getElementById('outputCode').value = finalOutput;
+            updateStats('output');
+        }
+    </script>
+</body>
+</html>
